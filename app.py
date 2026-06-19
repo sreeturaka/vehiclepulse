@@ -7,7 +7,7 @@ vehicle_events = []
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "healthy", "timestamp": datetime.datetime.utcnow().isoformat()})
+    return jsonify({"status": "healthy", "version": "1.0", "timestamp": datetime.datetime.utcnow().isoformat()})
 
 @app.route('/ingest', methods=['POST'])
 def ingest():
