@@ -24,3 +24,23 @@ jobs:
           format: 'table'
           exit-code: '0'
           severity: 'CRITICAL,HIGH'
+
+      # ===== NEW STEPS BELOW =====
+
+      - name: Login to Azure Container Registry
+        run: |
+          docker login ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }} \
+            --username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
+            --password ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+
+      - name: Tag image for ACR
+        run: |
+          docker tag vehiclepulse:${{ github.sha }} \
+            ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:${{ github.sha }}
+          docker tag vehiclepulse:${{ github.sha }} \
+            ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:latest
+
+      - name: Push image to Azure Container Registry
+        run: |
+          docker push ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:${{ github.sha }}
+          docker push ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:latest
