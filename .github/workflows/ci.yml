@@ -1,46 +1,63 @@
-name: CI Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [develop, main]
+    branches: [ develop, main ]
   pull_request:
-    branches: [develop, main]
+    branches: [ develop, main ]
 
 jobs:
-  build-and-scan:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+- name: Checkout code
+        uses: actions/checkout@v3
       - name: Build Docker image
-        run: docker build -t vehiclepulse:${{ github.sha }} .
-
+        run: |
+          docker build -t vehiclepulse:${{ github.sha }} .
+          docker tag vehiclepulse:${{ github.sha }} vehiclepulse:latest
       - name: Run Trivy vulnerability scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'vehiclepulse:${{ github.sha }}'
-          format: 'table'
+          image-ref: vehiclepulse:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
           exit-code: '0'
           severity: 'CRITICAL,HIGH'
-
-      # ===== NEW STEPS BELOW =====
-
       - name: Login to Azure Container Registry
         run: |
           docker login ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }} \
             --username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
             --password ${{ secrets.AZURE_REGISTRY_PASSWORD }}
-
       - name: Tag image for ACR
         run: |
-          docker tag vehiclepulse:${{ github.sha }} \
-            ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:${{ github.sha }}
-          docker tag vehiclepulse:${{ github.sha }} \
-            ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:latest
-
+          docker tag vehiclepulse:${{ github.sha }} ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:${{ github.sha }}
+          docker tag vehiclepulse:${{ github.sha }} ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:latest
       - name: Push image to Azure Container Registry
         run: |
           docker push ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:${{ github.sha }}
           docker push ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:latest
+      - name: Configure Azure CLI
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group vehiclepulse-rg \
+            --name vehiclepulse-aks \
+            --overwrite-existing
+      - name: Deploy to AKS
+        run: |
+          kubectl set image deployment/vehiclepulse \
+            vehiclepulse=${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}/vehiclepulse:${{ github.sha }} \
+            --record
+          kubectl rollout status deployment/vehiclepulse --timeout=5m
+      - name: Verify deployment
+        run: |
+          kubectl get deployments
+          kubectl get pods
+          kubectl get services
