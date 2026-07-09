@@ -1,4 +1,4 @@
-# VehiclePulse — DevOps Curriculum Recap (Stages 1–9)
+# VehiclePulse — Project Simulation (Stages 1–9)
 
 A hands-on, end-to-end DevOps build using a Flask app (VehiclePulse) to practice the full pipeline: source control, containers, Azure infra, IaC, GitOps, monitoring, and resilience.
 
